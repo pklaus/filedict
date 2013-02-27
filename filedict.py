@@ -5,15 +5,15 @@ Author: Erez Shinan
 Date  : 31-May-2009
 """
 
-import UserDict
-import cPickle as pickle
-
+from collections import UserDict
+import pickle
 import sqlite3
+import hashlib
 
 class Solutions:
     Sqlite3 = 0
 
-class FileDict(UserDict.DictMixin):
+class FileDict(UserDict):
     """A dictionary that stores its data persistantly in a file
 
     Options:
@@ -49,12 +49,18 @@ class FileDict(UserDict.DictMixin):
         self.__conn.commit()
 
     def __pack(self, value):
-        return sqlite3.Binary(pickle.dumps(value, -1))
+        return pickle.dumps(value, 3)
     def __unpack(self, value):
-        return pickle.loads(str(value))
+        return pickle.loads(value)
+
+    def __hash(self, data):
+        binary_data = self.__pack(data)
+        hash = int(hashlib.md5(binary_data).hexdigest(),16)
+        # We need a 32bit hash:
+        return hash % 0x7FFFFFFF
 
     def __get_id(self, key):
-        cursor = self.__conn.execute('select key,id from %s where hash=?;'%self.__tablename, (hash(key),))
+        cursor = self.__conn.execute('select key,id from %s where hash=?;'%self.__tablename, (self.__hash(key),))
         for k,id in cursor:
             if self.__unpack(k) == key:
                 return id
@@ -62,7 +68,7 @@ class FileDict(UserDict.DictMixin):
         raise KeyError(key)
 
     def __getitem__(self, key):
-        cursor = self.__conn.execute('select key,value from %s where hash=?;'%self.__tablename, (hash(key),))
+        cursor = self.__conn.execute('select key,value from %s where hash=?;'%self.__tablename, (self.__hash(key),))
         for k,v in cursor:
             if self.__unpack(k) == key:
                 return self.__unpack(v)
@@ -78,7 +84,7 @@ class FileDict(UserDict.DictMixin):
         except KeyError:
             key_pickle = self.__pack(key)
             cursor = self.__conn.execute('insert into %s (hash, key, value) values (?, ?, ?);'
-                    %self.__tablename, (hash(key), key_pickle, value_pickle) )
+                    %self.__tablename, (self.__hash(key), key_pickle, value_pickle) )
 
         assert cursor.rowcount == 1
 
@@ -96,7 +102,7 @@ class FileDict(UserDict.DictMixin):
 
 
     def update(self, d):
-        for k,v in d.iteritems():
+        for k,v in d.items():
             self.__setitem(k, v)
         self._commit()
 
@@ -107,13 +113,7 @@ class FileDict(UserDict.DictMixin):
     def values(self):
         return (self.__unpack(x[0]) for x in self.__conn.execute('select value from %s;'%self.__tablename) )
     def items(self):
-        return (map(self.__unpack, x) for x in self.__conn.execute('select key,value from %s;'%self.__tablename) )
-    def iterkeys(self):
-        return self.keys()
-    def itervalues(self):
-        return self.values()
-    def iteritems(self):
-        return self.items()
+        return (list(map(self.__unpack, x)) for x in self.__conn.execute('select key,value from %s;'%self.__tablename) )
 
     def __contains__(self, key):
         try:
