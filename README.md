@@ -74,4 +74,4 @@ Resources
 ---------
 
 * The **[original FileDict](https://github.com/erezsh/filedict)** had been written by Erez Sh. He published it on Github.
-* There is a similar Python module available called [sqldict](https://pypi.python.org/pypi/sqlitedict). It is not ready for Python3 yet and it is limited to textual keys for the dictionary.
+* There is a similar Python module available called [sqlitedict](https://pypi.python.org/pypi/sqlitedict). Since 2014-07 it also has a branch with support for Python3. It is, however, still limited to textual keys for the dictionary-like database.
